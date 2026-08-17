@@ -1,0 +1,68 @@
+{
+  "name": "clear-excel",
+  "version": "0.1.0",
+  "description": "Safely remove drawings, comments, embedded objects, and unused styles from XLSX workbooks.",
+  "author": "Vladislav Ivanov",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.cjs",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.cjs"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.cjs",
+    "index.d.ts",
+    "src/index.cjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vlad1slav1vanov/clear-excel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Vlad1slav1vanov/clear-excel/issues"
+  },
+  "homepage": "https://github.com/Vlad1slav1vanov/clear-excel#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "excel",
+    "xlsx",
+    "ooxml",
+    "sanitize",
+    "comments",
+    "images",
+    "styles"
+  ],
+  "scripts": {
+    "check:syntax": "node --check index.js && node --check index.cjs && node --check src/index.cjs",
+    "test": "node --test",
+    "pack:dry-run": "npm pack --dry-run",
+    "test:package": "node scripts/verify-package.cjs",
+    "check": "npm run check:syntax && npm test && npm run pack:dry-run && npm run test:package",
+    "prepublishOnly": "npm run check"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "exceljs": "^4.4.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

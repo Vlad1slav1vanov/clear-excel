@@ -1,68 +1,82 @@
 {
   "name": "clear-excel",
-  "version": "0.1.0",
-  "description": "Safely remove drawings, comments, embedded objects, and unused styles from XLSX workbooks.",
-  "author": "Vladislav Ivanov",
-  "license": "MIT",
-  "type": "module",
-  "main": "./index.cjs",
-  "module": "./index.js",
-  "types": "./index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js",
-      "require": "./index.cjs"
-    }
-  },
-  "files": [
-    "index.js",
-    "index.cjs",
-    "index.d.ts",
-    "src/index.cjs",
-    "README.md",
-    "LICENSE"
+  "version": "1.0.0",
+  "description": "Safely remove drawings, comments, and embedded objects from XLS, XLSX, and XLSM workbooks.",
+  "keywords": [
+    "comments",
+    "excel",
+    "images",
+    "ooxml",
+    "sanitize",
+    "styles",
+    "xls",
+    "xlsm",
+    "xlsx"
   ],
-  "engines": {
-    "node": ">=22"
+  "homepage": "https://github.com/Vlad1slav1vanov/clear-excel#readme",
+  "bugs": {
+    "url": "https://github.com/Vlad1slav1vanov/clear-excel/issues"
   },
-  "sideEffects": false,
+  "license": "MIT",
+  "author": "Vladislav Ivanov",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Vlad1slav1vanov/clear-excel.git"
   },
-  "bugs": {
-    "url": "https://github.com/Vlad1slav1vanov/clear-excel/issues"
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   },
-  "homepage": "https://github.com/Vlad1slav1vanov/clear-excel#readme",
   "publishConfig": {
     "access": "public"
   },
-  "keywords": [
-    "excel",
-    "xlsx",
-    "ooxml",
-    "sanitize",
-    "comments",
-    "images",
-    "styles"
-  ],
   "scripts": {
-    "check:syntax": "node --check index.js && node --check index.cjs && node --check src/index.cjs",
-    "test": "node --test",
-    "pack:dry-run": "npm pack --dry-run",
-    "test:package": "node scripts/verify-package.cjs",
-    "check": "npm run check:syntax && npm test && npm run pack:dry-run && npm run test:package",
+    "build:js": "vite build",
+    "build:types": "tsc --project tsconfig.build.json",
+    "build": "npm run build:js && npm run build:types",
+    "check:types": "tsc --project tsconfig.json",
+    "lint": "oxlint --deny-warnings .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "test": "tsx --test test/*.test.ts",
+    "pack:dry-run": "npm pack --dry-run --ignore-scripts",
+    "test:package": "tsx scripts/verify-package.ts",
+    "check": "npm run format:check && npm run lint && npm run check:types && npm test && npm run build && npm run pack:dry-run && npm run test:package",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run check"
   },
   "dependencies": {
+    "cfb": "1.2.2",
     "jszip": "^3.10.1"
   },
   "devDependencies": {
+    "@e965/xlsx": "0.20.3",
     "@types/node": "^22.0.0",
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1"
   },
   "overrides": {
     "uuid": "^11.1.1"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

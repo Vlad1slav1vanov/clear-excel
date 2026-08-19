@@ -53,14 +53,17 @@ runtime versions must also update the README and changelog.
 
 ## Release process
 
-Releases follow Semantic Versioning and are published from GitHub Releases:
+Releases follow Semantic Versioning and are published automatically after a
+version change reaches `main`:
 
 1. Update the version in `package.json` and `pnpm-lock.yaml`.
 2. Move the release notes into `CHANGELOG.md` and run `pnpm run check`.
 3. Merge the release commit into `main`.
-4. Publish a GitHub Release tagged `v<package-version>`.
-5. The publish workflow verifies the matching tag and publishes to npm with a
-   provenance attestation.
+4. The publish workflow checks whether that exact version exists in npm. New
+   versions are verified and published with a provenance attestation; existing
+   versions are skipped.
+5. After a successful publish, create a GitHub Release tagged
+   `v<package-version>` to keep the repository release history complete.
 
 The npm package must trust `.github/workflows/release.yml` in
 `Vlad1slav1vanov/clear-excel`. Configure this once in the package's npm Trusted

@@ -1,0 +1,43 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish npm package
+    if: >-
+      github.repository == 'Vlad1slav1vanov/clear-excel' &&
+      github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@24
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release tag
+        run: >-
+          node -e "const version = JSON.parse(require('node:fs').readFileSync('package.json')).version;
+          if (process.env.GITHUB_REF_NAME !== 'v' + version) {
+          throw new Error('Release tag must be v' + version); }"
+
+      - name: Publish with provenance
+        run: pnpm publish --provenance --access public

@@ -5,8 +5,12 @@
   "keywords": [
     "comments",
     "excel",
+    "excel-sanitizer",
     "images",
+    "ole",
     "ooxml",
+    "remove-comments",
+    "remove-images",
     "sanitize",
     "styles",
     "xls",
@@ -26,6 +30,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "type": "module",
@@ -45,18 +50,18 @@
   "scripts": {
     "build:js": "vite build",
     "build:types": "tsc --project tsconfig.build.json",
-    "build": "npm run build:js && npm run build:types",
+    "build": "pnpm run build:js && pnpm run build:types",
     "check:types": "tsc --project tsconfig.json",
     "lint": "oxlint --deny-warnings .",
     "lint:fix": "oxlint --fix .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "test": "tsx --test test/*.test.ts",
-    "pack:dry-run": "npm pack --dry-run --ignore-scripts",
+    "pack:dry-run": "pnpm --config.ignore-scripts=true pack --dry-run",
     "test:package": "tsx scripts/verify-package.ts",
-    "check": "npm run format:check && npm run lint && npm run check:types && npm test && npm run build && npm run pack:dry-run && npm run test:package",
-    "prepack": "npm run build",
-    "prepublishOnly": "npm run check"
+    "check": "pnpm run format:check && pnpm run lint && pnpm run check:types && pnpm test && pnpm run build && pnpm run pack:dry-run && pnpm run test:package",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run check"
   },
   "dependencies": {
     "cfb": "1.2.2",
@@ -78,5 +83,6 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "packageManager": "pnpm@11.22.0"
 }

@@ -1,0 +1,72 @@
+name: Bug report
+description: Report reproducible incorrect behavior in clear-excel
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not attach confidential workbooks or personal data. Use a minimal generated fixture whenever possible.
+
+  - type: input
+    id: version
+    attributes:
+      label: clear-excel version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: "22.18.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: format
+    attributes:
+      label: Workbook format
+      options:
+        - XLS
+        - XLSX
+        - XLSM
+        - Multiple formats
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Explain the observed behavior and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include a small script and steps for creating a safe test workbook.
+      render: javascript
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error details
+      description: Include the error code, message, and sanitized stack trace when applicable.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed confidential and personal data from the reproduction.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

@@ -1,9 +1,31 @@
-# clear-excel
+<div align="center">
 
-`clear-excel` safely removes drawing-backed content from legacy `.xls` and
+<h1>clear-excel</h1>
+
+<p><strong>Remove drawings, comments, and embedded objects from Excel workbooks
+without rebuilding their data model.</strong></p>
+
+<p>
+  <a href="https://www.npmjs.com/package/clear-excel"><img alt="npm version" src="https://img.shields.io/npm/v/clear-excel?style=flat-square&amp;logo=npm"></a>
+  <a href="https://www.npmjs.com/package/clear-excel"><img alt="npm downloads" src="https://img.shields.io/npm/dm/clear-excel?style=flat-square&amp;logo=npm"></a>
+  <a href="https://github.com/Vlad1slav1vanov/clear-excel/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Vlad1slav1vanov/clear-excel/ci.yml?branch=main&amp;style=flat-square&amp;logo=github&amp;label=CI"></a>
+  <a href="https://www.npmjs.com/package/clear-excel"><img alt="Node.js" src="https://img.shields.io/node/v/clear-excel?style=flat-square&amp;logo=nodedotjs"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/npm/l/clear-excel?style=flat-square"></a>
+</p>
+
+<p>
+  <a href="https://www.npmjs.com/package/clear-excel">npm</a> ·
+  <a href="https://github.com/Vlad1slav1vanov/clear-excel/releases">Releases</a> ·
+  <a href="./CHANGELOG.md">Changelog</a> ·
+  <a href="./CONTRIBUTING.md">Contributing</a> ·
+  <a href="./SECURITY.md">Security</a>
+</p>
+
+</div>
+
+`clear-excel` is an ESM-only Node.js library for sanitizing legacy `.xls` and
 OOXML `.xlsx`/`.xlsm` workbooks while preserving worksheet data and structure.
-It is an ESM-only Node.js library with no framework or consumer-side build
-requirement.
+It has no framework or consumer-side build requirement.
 
 ## What it removes
 
@@ -28,8 +50,12 @@ Encrypted `.xls` workbooks are not supported.
 ## Installation
 
 ```sh
-npm install clear-excel
+pnpm add clear-excel
 ```
+
+The package is published on
+[npm](https://www.npmjs.com/package/clear-excel) and includes TypeScript
+declarations.
 
 ## Buffer API
 
@@ -164,34 +190,39 @@ memory. Plan for memory usage above the input size, especially when increasing
 the defaults. The sanitizer does not evaluate formulas, execute embedded
 content, or execute VBA projects.
 
-## Publishing
+## Development
 
-Maintainers can verify the package locally with:
+Install dependencies and run the complete verification suite:
 
 ```sh
-npm ci
-npm run check
-npm login
-npm publish
+pnpm install --frozen-lockfile
+pnpm run check
 ```
 
-`npm run check` verifies Oxfmt formatting, runs type-aware Oxlint and strict
+`pnpm run check` verifies Oxfmt formatting, runs type-aware Oxlint and strict
 TypeScript checks, executes the tests, builds the ESM bundle and declarations,
-inspects `npm pack --dry-run`, and installs a temporary tarball to smoke-test
-both runtime imports and a TypeScript consumer. `prepack` creates `dist/`, and
-`prepublishOnly` runs the complete check automatically. npm credentials and
-publishing automation are deliberately not stored in this repository.
+inspects `pnpm pack --dry-run`, and installs a temporary tarball to smoke-test
+both runtime imports and a TypeScript consumer.
 
 Useful development commands:
 
 ```sh
-npm run format
-npm run lint
-npm run check:types
-npm test
-npm run build
+pnpm run format
+pnpm run lint
+pnpm run check:types
+pnpm test
+pnpm run build
 ```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution and release
+process.
+
+## Security
+
+Please report vulnerabilities privately by following
+[SECURITY.md](./SECURITY.md). Do not open a public issue for a suspected
+security vulnerability.
 
 ## License
 
-MIT
+[MIT](./LICENSE) © Vladislav Ivanov

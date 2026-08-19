@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 interface RunOptions {
@@ -20,7 +20,7 @@ interface PackResult {
 
 const projectDirectory = fileURLToPath(new URL("..", import.meta.url));
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "clear-excel-package-"));
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const childEnvironment: NodeJS.ProcessEnv = { ...process.env };
 delete childEnvironment.npm_config_dry_run;
 delete childEnvironment.NPM_CONFIG_DRY_RUN;
@@ -40,16 +40,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parsePackResult(output: string): PackResult {
   const parsed: unknown = JSON.parse(output);
-  if (!Array.isArray(parsed) || !isRecord(parsed[0])) {
-    throw new Error("npm pack returned an unexpected result");
+  const candidate = Array.isArray(parsed) ? parsed[0] : parsed;
+  if (!isRecord(candidate)) {
+    throw new Error("pnpm pack returned an unexpected result");
   }
-  const candidate = parsed[0];
   if (typeof candidate.filename !== "string" || !Array.isArray(candidate.files)) {
-    throw new Error("npm pack returned an unexpected result");
+    throw new Error("pnpm pack returned an unexpected result");
   }
   const files = candidate.files.map((file) => {
     if (!isRecord(file) || typeof file.path !== "string") {
-      throw new Error("npm pack returned an invalid file entry");
+      throw new Error("pnpm pack returned an invalid file entry");
     }
     return { path: file.path };
   });
@@ -97,13 +97,14 @@ function writeTypeConsumer(): void {
 try {
   const packResult = parsePackResult(
     run(
-      npmCommand,
-      ["pack", "--json", "--ignore-scripts", "--pack-destination", temporaryDirectory],
+      pnpmCommand,
+      ["--config.ignore-scripts=true", "pack", "--json", "--pack-destination", temporaryDirectory],
       { capture: true },
     ),
   );
   const packagedPaths = new Set(packResult.files.map((file) => file.path));
   const requiredPaths = [
+    "CHANGELOG.md",
     "LICENSE",
     "README.md",
     "dist/index.d.ts",
@@ -125,19 +126,16 @@ try {
     throw new Error("Published package unexpectedly contains development sources");
   }
 
-  const tarballPath = join(temporaryDirectory, packResult.filename);
+  const tarballPath = isAbsolute(packResult.filename)
+    ? packResult.filename
+    : join(temporaryDirectory, packResult.filename);
+  writeFileSync(
+    join(temporaryDirectory, "package.json"),
+    `${JSON.stringify({ private: true, type: "module" }, undefined, 2)}\n`,
+  );
   run(
-    npmCommand,
-    [
-      "install",
-      "--ignore-scripts",
-      "--no-audit",
-      "--no-fund",
-      "--package-lock=false",
-      tarballPath,
-      "@types/node@22",
-      "typescript@7",
-    ],
+    pnpmCommand,
+    ["add", "--ignore-scripts", "--save-exact", tarballPath, "@types/node@22", "typescript@7"],
     { cwd: temporaryDirectory },
   );
 

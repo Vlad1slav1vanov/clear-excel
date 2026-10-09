@@ -38,6 +38,12 @@ pnpm run build
 pnpm run test:package
 ```
 
+`pnpm run build` cleans `dist` and uses one NodeNext TypeScript compilation to
+emit ESM modules, declarations, and JavaScript maps with embedded sources.
+Run it before `pnpm run test:package`, which installs the tarball in an isolated
+consumer, exercises both APIs on all three supported formats, and checks a
+NodeNext TypeScript consumer against the published declarations.
+
 Add regression tests for behavior changes. Tests should use generated fixtures
 where practical so the repository never contains real user workbooks or
 sensitive spreadsheet data.

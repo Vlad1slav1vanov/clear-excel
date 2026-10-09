@@ -2,7 +2,15 @@ import type JSZip from "jszip";
 
 import type { ExcelSanitizationLimits, ReadBudget } from "../types.js";
 import { readXmlPart } from "./parts.js";
-import { findCollection, getAttribute, matchElements, replaceCollection } from "./xml.js";
+import {
+  findCollection,
+  findElements,
+  getAttribute,
+  isSpreadsheetElement,
+  mapOpeningElements,
+  replaceAttribute,
+  replaceCollection,
+} from "./xml.js";
 
 export async function removeUnusedCellStyles(
   zip: JSZip,
@@ -31,7 +39,11 @@ export async function removeUnusedCellStyles(
     return;
   }
 
-  const xfs = matchElements(cellXfs.body, "xf");
+  const xfs = findElements(stylesXml, "xf")
+    .filter(
+      (element) => isSpreadsheetElement(element) && element.parent?.start === cellXfs.element.start,
+    )
+    .map((element) => stylesXml.slice(element.start, element.end));
   // The spread already creates a fresh array, so this sort cannot mutate the source set.
   // oxlint-disable-next-line unicorn/no-array-sort
   const retainedIndexes = [...usedStyles].sort((left, right) => left - right);
@@ -63,24 +75,25 @@ function validateStyleIndexes(indexes: readonly number[], styleCount: number): v
 }
 
 export function collectStyleReferences(xml: string, references: Set<number>): void {
-  for (const tag of xml.match(/<(?:\w+:)?(?:c|row)\b[^>]*>/gi) ?? []) {
-    const value = getAttribute(tag, "s");
-    if (value !== undefined) {
-      references.add(Number(value));
+  mapOpeningElements(xml, (element, tag) => {
+    const attribute = element.localName === "col" ? "style" : "s";
+    if (isSpreadsheetElement(element) && ["c", "row", "col"].includes(element.localName)) {
+      const value = getAttribute(tag, attribute);
+      if (value !== undefined) {
+        references.add(Number(value));
+      }
     }
-  }
-  for (const tag of xml.match(/<(?:\w+:)?col\b[^>]*>/gi) ?? []) {
-    const value = getAttribute(tag, "style");
-    if (value !== undefined) {
-      references.add(Number(value));
-    }
-  }
+    return tag;
+  });
 }
 
 export function remapWorksheetStyles(xml: string, indexMap: ReadonlyMap<number, number>): string {
-  return xml
-    .replace(/<(?:\w+:)?(?:c|row)\b[^>]*>/gi, (tag) => remapNumericAttribute(tag, "s", indexMap))
-    .replace(/<(?:\w+:)?col\b[^>]*>/gi, (tag) => remapNumericAttribute(tag, "style", indexMap));
+  return mapOpeningElements(xml, (element, tag) => {
+    if (!isSpreadsheetElement(element) || !["c", "row", "col"].includes(element.localName)) {
+      return tag;
+    }
+    return remapNumericAttribute(tag, element.localName === "col" ? "style" : "s", indexMap);
+  });
 }
 
 export function remapNumericAttribute(
@@ -88,9 +101,7 @@ export function remapNumericAttribute(
   attributeName: string,
   indexMap: ReadonlyMap<number, number>,
 ): string {
-  const expression = new RegExp(`(\\s${attributeName}\\s*=\\s*)(["'])(\\d+)\\2`, "i");
-  return tag.replace(expression, (match: string, prefix: string, quote: string, value: string) => {
-    const remapped = indexMap.get(Number(value));
-    return remapped === undefined ? match : `${prefix}${quote}${remapped}${quote}`;
-  });
+  const value = getAttribute(tag, attributeName);
+  const remapped = value === undefined ? undefined : indexMap.get(Number(value));
+  return remapped === undefined ? tag : replaceAttribute(tag, attributeName, String(remapped));
 }

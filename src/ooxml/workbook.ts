@@ -5,7 +5,7 @@ import type { NormalizedSanitizeOptions, ReadBudget } from "../types.js";
 import { hasZipSignature, validateZipCentralDirectory } from "../zip/central-directory.js";
 import { removeThreadedCommentExtensions, removeWorksheetDrawingMarkup } from "./cleanup.js";
 import { DRAWING_RELATIONSHIP_SUFFIXES, PERSON_RELATIONSHIP_SUFFIXES } from "./constants.js";
-import { readXmlPart, requireXml } from "./parts.js";
+import { readXmlPart, requireXml, validateUncompressedSize } from "./parts.js";
 import {
   parseRelationships,
   relationshipFileForPart,
@@ -14,7 +14,7 @@ import {
   type Relationship,
 } from "./relationships.js";
 import { removeUnusedCellStyles } from "./styles.js";
-import { getAttribute } from "./xml.js";
+import { findElements, getNamespacedAttribute, isSpreadsheetElement } from "./xml.js";
 
 const WORKBOOK_PATH = "xl/workbook.xml";
 const WORKBOOK_RELATIONSHIPS_PATH = "xl/_rels/workbook.xml.rels";
@@ -48,6 +48,7 @@ export async function sanitizeOoxmlWorkbook(
 
   await removeUnreachableParts(context.zip, detachedRoots, context.readBudget, options.limits);
   await removeUnusedCellStyles(context.zip, worksheetXmlByPath, context.readBudget, options.limits);
+  await validateUncompressedSize(context.zip, options.limits.maxUncompressedBytes);
   return context.zip.generateAsync({
     type: "nodebuffer",
     compression: "DEFLATE",
@@ -80,6 +81,8 @@ async function loadWorkbookContext(
     options.limits.maxRelationshipsXmlBytes,
   );
   await requireXml(zip, CONTENT_TYPES_PATH, readBudget, options.limits.maxMetadataXmlBytes);
+  // readXmlPart normalizes encoding declarations; persist the decoded metadata as UTF-8.
+  zip.file(WORKBOOK_PATH, workbookXml);
 
   return {
     zip,
@@ -95,20 +98,44 @@ function findWorksheetPaths(
   workbookRelationships: readonly Relationship[],
   requireSingleWorksheet: boolean,
 ): string[] {
-  const sheetTags = workbookXml.match(/<(?:\w+:)?sheet\b[^>]*\/?>/gi) ?? [];
-  enforceWorksheetCount(sheetTags.length, requireSingleWorksheet);
-  if (sheetTags.length === 0) {
+  const sheets = findElements(workbookXml, "sheet").filter(
+    (element) =>
+      isSpreadsheetElement(element) &&
+      element.parent !== undefined &&
+      isSpreadsheetElement(element.parent, "sheets"),
+  );
+  enforceWorksheetCount(sheets.length, requireSingleWorksheet);
+  if (sheets.length === 0) {
     throw new Error("Workbook contains no sheets");
   }
 
   const relationshipsById = new Map(
     workbookRelationships.map((relationship) => [relationship.id, relationship]),
   );
-  return sheetTags.flatMap((sheetTag) => {
-    const id = getAttribute(sheetTag, "r:id");
+  const worksheetPaths = sheets.flatMap((sheet) => {
+    const id = getNamespacedAttribute(sheet, "id", [
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+      "http://purl.oclc.org/ooxml/officeDocument/relationships",
+    ]);
     const relationship = id ? relationshipsById.get(id) : undefined;
-    return relationship?.type.endsWith("/worksheet") ? [relationship.target] : [];
+    if (!relationship || relationship.targetMode?.toLowerCase() === "external") {
+      throw new Error(
+        `Missing or invalid workbook sheet relationship: ${id ?? "no relationship ID"}`,
+      );
+    }
+    if (
+      !["/worksheet", "/chartsheet", "/dialogsheet", "/macrosheet", "/intlMacrosheet"].some(
+        (suffix) => relationship.type.endsWith(suffix),
+      )
+    ) {
+      throw new Error(`Invalid workbook sheet relationship type: ${relationship.type}`);
+    }
+    return relationship.type.endsWith("/worksheet") ? [relationship.target] : [];
   });
+  if (worksheetPaths.length === 0) {
+    throw new Error("Workbook contains no worksheets");
+  }
+  return worksheetPaths;
 }
 
 function cleanWorkbookRelationships(context: WorkbookContext): Set<string> {

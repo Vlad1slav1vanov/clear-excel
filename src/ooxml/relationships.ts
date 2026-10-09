@@ -4,7 +4,13 @@ import type JSZip from "jszip";
 
 import type { ExcelSanitizationLimits, ReadBudget } from "../types.js";
 import { readXmlPart, requireXml } from "./parts.js";
-import { getAttribute } from "./xml.js";
+import { findElements, getNamespacedAttribute, removeElements, type XmlElement } from "./xml.js";
+
+const PACKAGE_RELATIONSHIP_NAMESPACES = new Set([
+  "",
+  "http://schemas.openxmlformats.org/package/2006/relationships",
+  "http://purl.oclc.org/ooxml/package/relationships",
+]);
 
 export interface Relationship {
   id: string;
@@ -26,47 +32,61 @@ export function removeRelationships(
   relationshipSuffixes: readonly string[],
 ): RemovedRelationships {
   const targets = new Set<string>();
-  const cleaned = xml.replace(
-    /<(?:\w+:)?Relationship\b[^>]*?(?:\/\s*>|>\s*<\/(?:\w+:)?Relationship\s*>)/gi,
-    (tag) => {
-      const type = getAttribute(tag, "Type") ?? "";
-      const target = getAttribute(tag, "Target");
-      const targetMode = getAttribute(tag, "TargetMode");
-      if (
-        !target ||
-        targetMode?.toLowerCase() === "external" ||
-        !relationshipSuffixes.some((suffix) => type.endsWith(suffix))
-      ) {
-        return tag;
-      }
-      targets.add(resolveTarget(source, target));
-      return "";
-    },
+  const removedIds = new Set<string>();
+  for (const relationship of parseRelationships(xml, source)) {
+    if (
+      relationship.targetMode?.toLowerCase() !== "external" &&
+      relationshipSuffixes.some((suffix) => relationship.type.endsWith(suffix))
+    ) {
+      removedIds.add(relationship.id);
+      targets.add(relationship.target);
+    }
+  }
+  const cleaned = removeElements(
+    xml,
+    (element) =>
+      isRelationshipElement(element) &&
+      removedIds.has(getNamespacedAttribute(element, "Id", [""]) ?? ""),
   );
   return { xml: cleaned, targets };
 }
 
 export function parseRelationships(xml: string, source: string): Relationship[] {
-  return Array.from(
-    xml.matchAll(/<(?:\w+:)?Relationship\b([^>]*?)(?:\/\s*>|>\s*<\/(?:\w+:)?Relationship\s*>)/gi),
-  ).flatMap((match) => {
-    const attributes = match[1] ?? "";
-    const id = getAttribute(attributes, "Id");
-    const target = getAttribute(attributes, "Target");
-    const type = getAttribute(attributes, "Type");
-    if (!id || !target || !type) {
-      return [];
-    }
-    const targetMode = getAttribute(attributes, "TargetMode");
-    return [
-      {
+  const ids = new Set<string>();
+  return findElements(xml, "Relationship")
+    .filter(isRelationshipElement)
+    .map((element) => {
+      const id = getNamespacedAttribute(element, "Id", [""]);
+      const target = getNamespacedAttribute(element, "Target", [""]);
+      const type = getNamespacedAttribute(element, "Type", [""]);
+      if (!id || !target || !type) {
+        throw new Error(`Invalid relationship in ${source || "package root"}`);
+      }
+      if (ids.has(id)) {
+        throw new Error(`Duplicate relationship ID in ${source || "package root"}: ${id}`);
+      }
+      ids.add(id);
+      const targetMode = getNamespacedAttribute(element, "TargetMode", [""]);
+      if (
+        targetMode !== undefined &&
+        !["internal", "external"].includes(targetMode.toLowerCase())
+      ) {
+        throw new Error(`Invalid relationship target mode: ${targetMode}`);
+      }
+      return {
         id,
         target: targetMode?.toLowerCase() === "external" ? target : resolveTarget(source, target),
         targetMode,
         type,
-      },
-    ];
-  });
+      };
+    });
+}
+
+function isRelationshipElement(element: XmlElement): boolean {
+  return (
+    element.localName === "Relationship" &&
+    PACKAGE_RELATIONSHIP_NAMESPACES.has(element.namespaceUri)
+  );
 }
 
 export function resolveTarget(source: string, target: string): string {
@@ -125,9 +145,17 @@ export async function removeUnreachableParts(
   );
   zip.file(
     "[Content_Types].xml",
-    contentTypes.replace(/<(?:\w+:)?Override\b[^>]*\/>/gi, (tag) => {
-      const partName = getAttribute(tag, "PartName")?.replace(/^\//, "");
-      return partName && deletedParts.has(partName) ? "" : tag;
+    removeElements(contentTypes, (element) => {
+      if (
+        element.localName !== "Override" ||
+        !["", "http://schemas.openxmlformats.org/package/2006/content-types"].includes(
+          element.namespaceUri,
+        )
+      ) {
+        return false;
+      }
+      const partName = getNamespacedAttribute(element, "PartName", [""])?.replace(/^\//, "");
+      return partName !== undefined && deletedParts.has(partName);
     }),
   );
 }

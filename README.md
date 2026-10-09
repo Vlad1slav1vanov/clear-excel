@@ -98,6 +98,11 @@ await sanitizeExcelFile("report.xlsx", "report.cleaned.xlsx", {
 });
 ```
 
+Paths that refer to the source through symbolic links or hard links are also
+rejected. New outputs are created exclusively; a failed open leaves an existing
+file intact. Overwrites use an atomic replacement and preserve the existing
+output's file permissions.
+
 ## Options
 
 Both sanitizing functions accept these options:
@@ -116,7 +121,7 @@ The exported `DEFAULT_LIMITS` object contains the defaults:
 | -------------------------- | ---------------------------: |
 | `maxEntryCount`            |               10,000 entries |
 | `maxUncompressedBytes`     |                      512 MiB |
-| `maxXmlBytes`              | 512 MiB aggregate XML output |
+| `maxXmlBytes`              |  512 MiB aggregate XML reads |
 | `maxWorksheetXmlBytes`     |        256 MiB per worksheet |
 | `maxStylesXmlBytes`        |                       64 MiB |
 | `maxMetadataXmlBytes`      |     16 MiB per metadata part |
@@ -164,7 +169,7 @@ try {
 | `ERR_INVALID_XLSX`          | The ZIP/OOXML package is malformed or unsupported.  |
 | `ERR_LIMIT_EXCEEDED`        | A configured ZIP or XML limit was exceeded.         |
 | `ERR_WORKSHEET_COUNT`       | Exactly one worksheet was required.                 |
-| `ERR_SAME_PATH`             | Input and output resolve to the same path.          |
+| `ERR_SAME_PATH`             | Input and output refer to the same file.            |
 | `ERR_OUTPUT_EXISTS`         | Output exists and `overwrite` is false.             |
 | `ERR_FILE_READ`             | The input could not be read.                        |
 | `ERR_FILE_WRITE`            | The sanitized output could not be written.          |
@@ -178,7 +183,16 @@ Before loading an OOXML archive, `clear-excel` validates the ZIP central
 directory, rejects ZIP64 and multi-disk archives, rejects unsafe entry paths,
 and checks declared entry counts and expansion sizes. Required XML parts are
 inflated lazily with both per-part and aggregate runtime budgets, including
-protection when ZIP size metadata has been forged.
+protection when ZIP size metadata has been forged. Before generating the output,
+all retained archive parts are streamed through one actual-byte
+`maxUncompressedBytes` budget, including binary VBA projects and other retained
+content.
+
+Processed OOXML XML parts support UTF-8, UTF-16LE, and UTF-16BE. Rewritten parts
+use UTF-8 with a matching XML declaration. XML cleanup resolves namespace URIs
+independently of prefix names and preserves text, CDATA, XML comments, and
+unrelated elements. Missing or invalid worksheet relationships are rejected
+before style records can be removed.
 
 For `.xls`, the library validates CFB entry and byte limits, parses the BIFF
 record stream without evaluating formulas, removes drawing-layer records, and
@@ -200,9 +214,15 @@ pnpm run check
 ```
 
 `pnpm run check` verifies Oxfmt formatting, runs type-aware Oxlint and strict
-TypeScript checks, executes the tests, builds the ESM bundle and declarations,
-inspects `pnpm pack --dry-run`, and installs a temporary tarball to smoke-test
-both runtime imports and a TypeScript consumer.
+TypeScript checks, executes the tests, builds the ESM modules and declarations,
+inspects `pnpm pack --dry-run`, and installs a temporary tarball to verify both
+APIs with `.xls`, `.xlsx`, and `.xlsm` workbooks and a NodeNext TypeScript
+consumer.
+
+The build cleans `dist` and runs `tsc` once in NodeNext mode. It emits separate
+ESM modules, TypeScript declarations, and JavaScript source maps with embedded
+sources. Runtime dependencies are installed normally; the package does not
+bundle a second copy of them.
 
 Useful development commands:
 

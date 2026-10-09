@@ -2,15 +2,48 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DEFAULT_LIMITS, ExcelSanitizationError, sanitizeExcel } from "../src/index.js";
-import { addEscapingRelationship, createXlsx } from "./fixtures/workbook.js";
+import JSZip from "jszip";
+
+import { addEscapingRelationship, createXlsm, createXlsx } from "./fixtures/workbook.js";
 import {
   addUnsafeCentralDirectoryName,
   createRuntimeXmlBomb,
+  forgeZipEntrySizes,
   inflateDeclaredZipSize,
   markAsMultiDisk,
   markAsZip64,
 } from "./fixtures/zip.js";
 import { expectError } from "./helpers.js";
+
+test("enforces actual aggregate expansion limits for retained binary parts", async () => {
+  const zip = await JSZip.loadAsync(await createXlsm());
+  zip.file("xl/vbaProject.bin", Buffer.alloc(2 * 1024 * 1024, 0x41));
+  const compressed = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+  const forged = forgeZipEntrySizes(compressed, "xl/vbaProject.bin", 1);
+  await assert.rejects(
+    () => sanitizeExcel(forged, { limits: { maxUncompressedBytes: 1024 * 1024 } }),
+    (error: unknown) => {
+      assert.ok(error instanceof ExcelSanitizationError);
+      assert.equal(error.code, "ERR_LIMIT_EXCEEDED");
+      assert.equal(error.details?.limit, "maxUncompressedBytes");
+      assert.equal(error.details?.partName, "xl/vbaProject.bin");
+      return true;
+    },
+  );
+});
+
+test("rejects false binary sizes and preserves valid binary contents", async () => {
+  const zip = await JSZip.loadAsync(await createXlsm());
+  const vba = Buffer.alloc(32 * 1024, 0x42);
+  zip.file("xl/vbaProject.bin", vba);
+  const input = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+  await expectError(
+    () => sanitizeExcel(forgeZipEntrySizes(input, "xl/vbaProject.bin", 1)),
+    "ERR_INVALID_XLSX",
+  );
+  const output = await JSZip.loadAsync(await sanitizeExcel(input));
+  assert.deepEqual(await output.file("xl/vbaProject.bin")?.async("nodebuffer"), vba);
+});
 
 test("rejects declared and actual XML expansion bombs", async () => {
   await expectError(

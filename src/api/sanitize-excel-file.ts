@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readFile, rename, unlink, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { open, readFile, realpath, rename, stat, unlink } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { hasCompoundFileSignature } from "../biff/workbook.js";
 import { createError } from "../errors.js";
@@ -28,6 +28,7 @@ export async function sanitizeExcelFile(
   }
 
   const input = await readInputFile(absoluteInputPath);
+  await validateDistinctFiles(absoluteInputPath, absoluteOutputPath);
   validateInputFormat(input, format);
   const sanitized = await sanitizeExcel(input, {
     requireSingleWorksheet: normalized.requireSingleWorksheet,
@@ -84,7 +85,7 @@ async function readInputFile(inputPath: string): Promise<Buffer> {
 
 async function writeNewFile(outputPath: string, contents: Buffer): Promise<void> {
   try {
-    await writeFile(outputPath, contents, { flag: "wx" });
+    await writeExclusiveFile(outputPath, contents);
   } catch (error) {
     if (hasErrorCode(error, "EEXIST")) {
       throw createError("ERR_OUTPUT_EXISTS", {
@@ -92,7 +93,6 @@ async function writeNewFile(outputPath: string, contents: Buffer): Promise<void>
         details: { outputPath },
       });
     }
-    await removeIfPresent(outputPath);
     throw createError("ERR_FILE_WRITE", {
       cause: error,
       details: { outputPath },
@@ -102,15 +102,84 @@ async function writeNewFile(outputPath: string, contents: Buffer): Promise<void>
 
 async function replaceFileAtomically(outputPath: string, contents: Buffer): Promise<void> {
   const temporaryPath = `${outputPath}.${process.pid}.${randomUUID()}.tmp`;
+  let temporaryCreated = false;
   try {
-    await writeFile(temporaryPath, contents, { flag: "wx" });
+    const existingOutput = await stat(outputPath).catch((error: unknown) => {
+      if (hasErrorCode(error, "ENOENT")) {
+        return undefined;
+      }
+      throw error;
+    });
+    const outputMode = existingOutput ? existingOutput.mode & 0o777 : undefined;
+    await writeExclusiveFile(temporaryPath, contents, outputMode);
+    temporaryCreated = true;
     await rename(temporaryPath, outputPath);
   } catch (error) {
-    await removeIfPresent(temporaryPath);
+    if (temporaryCreated) {
+      await removeIfPresent(temporaryPath);
+    }
     throw createError("ERR_FILE_WRITE", {
       cause: error,
       details: { outputPath },
     });
+  }
+}
+
+async function writeExclusiveFile(path: string, contents: Buffer, mode?: number): Promise<void> {
+  // A failed open does not establish ownership, so it must never trigger unlink.
+  const handle = await open(path, "wx", mode);
+  try {
+    await handle.writeFile(contents);
+    if (mode !== undefined) {
+      await handle.chmod(mode);
+    }
+    await handle.close();
+  } catch (error) {
+    await handle.close().catch(() => undefined);
+    await removeIfPresent(path);
+    throw error;
+  }
+}
+
+async function validateDistinctFiles(inputPath: string, outputPath: string): Promise<void> {
+  let inputRealPath: string;
+  let inputStat: Awaited<ReturnType<typeof stat>>;
+  try {
+    inputRealPath = await realpath(inputPath);
+    inputStat = await stat(inputPath);
+  } catch (error) {
+    throw createError("ERR_FILE_READ", { cause: error, details: { inputPath } });
+  }
+
+  let sameFile: boolean;
+  try {
+    const outputStat = await stat(outputPath).catch((error: unknown) => {
+      if (hasErrorCode(error, "ENOENT")) {
+        return undefined;
+      }
+      throw error;
+    });
+    const outputRealPath = outputStat
+      ? await realpath(outputPath)
+      : await realpath(dirname(outputPath))
+          .then((parent) => join(parent, basename(outputPath)))
+          .catch((error: unknown) => {
+            if (hasErrorCode(error, "ENOENT")) {
+              return outputPath;
+            }
+            throw error;
+          });
+    sameFile =
+      inputRealPath === outputRealPath ||
+      (outputStat !== undefined &&
+        inputStat.dev === outputStat.dev &&
+        inputStat.ino === outputStat.ino);
+  } catch (error) {
+    throw createError("ERR_FILE_WRITE", { cause: error, details: { outputPath } });
+  }
+
+  if (sameFile) {
+    throw createError("ERR_SAME_PATH", { details: { inputPath, outputPath } });
   }
 }
 

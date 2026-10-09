@@ -1,6 +1,6 @@
 {
   "name": "clear-excel",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Safely remove drawings, comments, and embedded objects from XLS, XLSX, and XLSM workbooks.",
   "keywords": [
     "comments",

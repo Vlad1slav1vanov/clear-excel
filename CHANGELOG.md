@@ -3,7 +3,7 @@
 All notable changes to this project are documented in this file. The project
 follows [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## [1.0.4] - 2026-10-09
 
 ### Fixed
 
@@ -48,5 +48,6 @@ follows [Semantic Versioning](https://semver.org/).
 - Initial release with buffer and file APIs for sanitizing `.xls`, `.xlsx`,
   and `.xlsm` workbooks.
 
+[1.0.4]: https://www.npmjs.com/package/clear-excel/v/1.0.4
 [1.0.0]: https://www.npmjs.com/package/clear-excel/v/1.0.0
 [0.1.0]: https://www.npmjs.com/package/clear-excel/v/0.1.0

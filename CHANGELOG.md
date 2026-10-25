@@ -3,6 +3,14 @@
 All notable changes to this project are documented in this file. The project
 follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.6] - 2026-10-25
+
+### Changed
+
+- Update development tooling to oxfmt 0.73.0, oxlint 1.88.0, and
+  oxlint-tsgolint 7.0.2004.
+- Create a GitHub Release automatically after a successful npm publication.
+
 ## [1.0.5] - 2026-10-11
 
 ### Changed
@@ -55,6 +63,7 @@ follows [Semantic Versioning](https://semver.org/).
 - Initial release with buffer and file APIs for sanitizing `.xls`, `.xlsx`,
   and `.xlsm` workbooks.
 
+[1.0.6]: https://www.npmjs.com/package/clear-excel/v/1.0.6
 [1.0.5]: https://www.npmjs.com/package/clear-excel/v/1.0.5
 [1.0.4]: https://www.npmjs.com/package/clear-excel/v/1.0.4
 [1.0.0]: https://www.npmjs.com/package/clear-excel/v/1.0.0

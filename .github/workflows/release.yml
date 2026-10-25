@@ -17,6 +17,9 @@ jobs:
     name: Publish npm package
     if: github.repository == 'Vlad1slav1vanov/clear-excel'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+      already-published: ${{ steps.registry.outputs.published }}
 
     steps:
       - name: Check out repository
@@ -53,3 +56,34 @@ jobs:
       - name: Publish with provenance
         if: steps.registry.outputs.published == 'false'
         run: pnpm publish --provenance --access public
+
+  release:
+    name: Create GitHub Release
+    needs: publish
+    if: needs.publish.outputs.already-published == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Create release from changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          if gh release view "v${PACKAGE_VERSION}" >/dev/null 2>&1; then
+            exit 0
+          fi
+          awk -v version="$PACKAGE_VERSION" '
+            index($0, "## [" version "]") == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          test -s "$RUNNER_TEMP/release-notes.md"
+          gh release create "v${PACKAGE_VERSION}" \
+            --target "$GITHUB_SHA" \
+            --title "v${PACKAGE_VERSION}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
